@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 @Service
 @Slf4j
 @CacheConfig(cacheNames = "users")
+// @CacheConfig(cacheNames = "users", cacheManager = "redisCacheManager")
 public class UserService {
 
     private static final List<User> USER_LIST = new ArrayList<>();
