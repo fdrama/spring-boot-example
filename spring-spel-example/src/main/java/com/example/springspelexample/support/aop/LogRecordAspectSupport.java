@@ -5,6 +5,7 @@ import com.example.springspelexample.support.annoation.LogRecordOperation;
 import com.example.springspelexample.support.annoation.LogRecordOperationSource;
 import com.example.springspelexample.support.expression.LogRecordOperationExpressionEvaluator;
 import com.example.springspelexample.support.expression.LogRecordThreadContext;
+import com.example.springspelexample.support.function.IFunctionService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.aop.framework.AopProxyUtils;
@@ -65,6 +66,8 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
 
     private SingletonSupplier<LogRecordErrorHandler> errorHandler;
 
+    private IFunctionService functionService;
+
     private final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{\\s*(\\w*)\\s*\\{(.*?)}}");
 
     public void configure(
@@ -98,6 +101,7 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
     @Override
     public void afterSingletonsInstantiated() {
         this.initialized = true;
+        setFunctionService(BeanFactoryAnnotationUtils.qualifiedBeanOfType(beanFactory, IFunctionService.class, "functionService"));
     }
 
     protected Object execute(LogRecordOperationInvoker invoker, Object target, Method method, Object[] args) {
@@ -142,9 +146,10 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
                 while (matcher.find()) {
                     String functionName = matcher.group(1);
                     String expression = matcher.group(2);
-                    Object value  = evaluator.getExpression(expression, methodKey, evaluationContext);;
+                    Object value = evaluator.getExpression(expression, methodKey, evaluationContext);
+                    ;
                     if (StringUtils.hasText(functionName)) {
-                        value = evaluator.getFunction(functionName).apply(value);
+                        value = functionService.apply(functionName, value);
                     }
                     matcher.appendReplacement(parsedStr, Matcher.quoteReplacement(value == null ? "" : value.toString()));
                 }
@@ -373,5 +378,9 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
     protected void clearMetadataCache() {
         this.metadataCache.clear();
         // this.evaluator.clear();
+    }
+
+    public void setFunctionService(IFunctionService functionService) {
+        this.functionService = functionService;
     }
 }

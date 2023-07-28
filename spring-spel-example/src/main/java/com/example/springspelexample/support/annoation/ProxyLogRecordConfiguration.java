@@ -4,9 +4,15 @@ import com.example.springspelexample.support.aop.BeanFactoryLogRecordSourceAdvis
 import com.example.springspelexample.support.aop.LogRecordErrorHandler;
 import com.example.springspelexample.support.aop.LogRecordInterceptor;
 import com.example.springspelexample.support.aop.LogRecordResolver;
+import com.example.springspelexample.support.function.DefaultFunctionServiceImpl;
+import com.example.springspelexample.support.function.DefaultParseFunction;
+import com.example.springspelexample.support.function.IFunctionService;
+import com.example.springspelexample.support.function.IParseFunction;
+import com.example.springspelexample.support.function.ParseFunctionFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.config.CacheManagementConfigUtils;
 import org.springframework.context.annotation.Bean;
@@ -71,6 +77,24 @@ public class ProxyLogRecordConfiguration implements ImportAware {
         interceptor.setLogRecordOperationSource(logRecordOperationSource);
         return interceptor;
     }
+
+    @Bean
+    @ConditionalOnMissingBean(IFunctionService.class)
+    public IFunctionService functionService(ParseFunctionFactory parseFunctionFactory) {
+        return new DefaultFunctionServiceImpl(parseFunctionFactory);
+    }
+
+    @Bean
+    public ParseFunctionFactory parseFunctionFactory(@Autowired List<IParseFunction> parseFunctions) {
+        return new ParseFunctionFactory(parseFunctions);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(IParseFunction.class)
+    public DefaultParseFunction parseFunction() {
+        return new DefaultParseFunction();
+    }
+
 
     @Override
     public void setImportMetadata(AnnotationMetadata importMetadata) {
