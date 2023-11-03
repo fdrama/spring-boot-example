@@ -3,6 +3,16 @@
 
     <property name="app.name" value="spring-docker"/>
 
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS}  [%-5p] [%thread] %X{TRACE_ID} %-5level %logger{144}:%L - %msg%n" />
+
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoder 默认配置为PatternLayoutEncoder -->
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>/data/logs/${app.name}-info.log</file>
 
@@ -11,11 +21,12 @@
         </rollingPolicy>
 
         <encoder>
-            <pattern>%msg%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
     <root level="info">
+        <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </root>
 
