@@ -1,5 +1,6 @@
 package com.example.springspelexample.support.annoation;
 
+import com.example.springspelexample.support.config.LogRecordConfig;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.lang.Nullable;
@@ -72,29 +73,26 @@ public class SpringLogRecordAnnotationParser implements LogRecordAnnotationParse
 
     private LogRecordOperation parseLogRecordAnnotation(AnnotatedElement ae, DefaultLogRecordConfig defaultLogRecordConfig, LogRecord logRecord) {
         LogRecordOperation.Builder builder = new LogRecordOperation.Builder();
-
         builder.setName(ae.toString());
         builder.setBizNo(logRecord.bizNo());
         builder.setCondition(logRecord.condition());
-        builder.setContent(logRecord.content());
-        builder.setOperator(logRecord.operator());
+        builder.setSuccessCondition(logRecord.successCondition());
+        builder.setSuccessTemplate(logRecord.successTemplate());
+        builder.setFailTemplate(logRecord.failTemplate());
+        builder.setOperator(logRecord.operatorId());
         builder.setType(logRecord.type());
         builder.setSubType(logRecord.subType());
         builder.setExtra(logRecord.extra());
-        builder.setOperatorGetter(logRecord.operatorGetter());
         defaultLogRecordConfig.applyDefault(builder);
         LogRecordOperation op = builder.build();
         validateLogRecordOperation(ae, op);
-
         return op;
     }
 
     private void validateLogRecordOperation(AnnotatedElement ae, LogRecordOperation op) {
-        if (StringUtils.hasText(op.getOperator()) && StringUtils.hasText(op.getOperatorGetter())) {
-            throw new IllegalStateException("Invalid log record annotation configuration on '" +
-                    ae.toString() + "'. Both 'operator' and 'operatorGetter' attributes have been set. " +
-                    "These attributes are mutually exclusive: either set the SpEL expression used to" +
-                    "compute the operator at runtime or set the name of the operatorGetter bean to use.");
+        if (!StringUtils.hasText(op.getSuccessTemplate()) && !StringUtils.hasText(op.getFailTemplate())) {
+            throw new IllegalArgumentException("Invalid log record annotation configuration on '" +
+                    ae.toString() + "'. Either 'successTemplate' or 'failTemplate' must be set.");
         }
     }
 
@@ -111,10 +109,6 @@ public class SpringLogRecordAnnotationParser implements LogRecordAnnotationParse
             this.target = targetClass;
         }
 
-        public Class<?> getTargetClass() {
-            return target;
-        }
-
         private boolean initialized = false;
 
         public void applyDefault(LogRecordOperation.Builder builder) {
@@ -128,10 +122,10 @@ public class SpringLogRecordAnnotationParser implements LogRecordAnnotationParse
                 }
                 this.initialized = true;
             }
-
             if (builder.getLogResolver().isEmpty() && this.logResolver != null) {
                 builder.setLogResolver(this.logResolver);
-            } else if (StringUtils.hasText(this.errorHandler)) {
+            }
+            if (!StringUtils.hasText(builder.getErrorHandler()) && this.errorHandler != null) {
                 builder.setErrorHandler(this.errorHandler);
             }
         }

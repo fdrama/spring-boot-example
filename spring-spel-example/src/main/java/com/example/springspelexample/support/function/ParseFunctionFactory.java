@@ -28,15 +28,8 @@ public class ParseFunctionFactory {
         }
     }
 
-    public void setParseFunctionMap(Map<String, IParseFunction> parseFunctionMap) {
-        this.parseFunctionMap = parseFunctionMap;
-    }
-
     public IParseFunction getFunction(String functionName) {
         return parseFunctionMap.get(functionName);
     }
 
-    public boolean isBeforeFunction(String functionName) {
-        return parseFunctionMap.get(functionName) != null && parseFunctionMap.get(functionName).executeBefore();
-    }
 }

@@ -28,15 +28,15 @@ public class LogRecordOperationExpressionEvaluator extends CachedExpressionEvalu
     /**
      * The name of the variable holding the result object.
      */
-    public static final String RESULT_VARIABLE = "result";
+    public static final String RESULT_VARIABLE = "_result";
 
-
+    public static final String ERROR_MSG_VARIABLE = "_errorMsg";
     private final Map<ExpressionKey, Expression> expressionCache = new ConcurrentHashMap<>(64);
 
     private final Map<ExpressionKey, Expression> conditionCache = new ConcurrentHashMap<>(64);
 
     @Nullable
-    public Object getExpression(String keyExpression, AnnotatedElementKey methodKey, EvaluationContext evalContext) {
+    public Object getExpressionValue(String keyExpression, AnnotatedElementKey methodKey, EvaluationContext evalContext) {
         return getExpression(this.expressionCache, methodKey, keyExpression).getValue(evalContext);
     }
 
@@ -45,7 +45,7 @@ public class LogRecordOperationExpressionEvaluator extends CachedExpressionEvalu
                 evalContext, Boolean.class)));
     }
 
-    public EvaluationContext createEvaluationContext(Method method, Object[] args, Object target, Class<?> targetClass, Method targetMethod, Object result, BeanFactory beanFactory) {
+    public EvaluationContext createEvaluationContext(Method method, Object[] args, Object target, Class<?> targetClass, Method targetMethod, Object result, String errorMsg, BeanFactory beanFactory) {
         LogRecordExpressionRootObject rootObject = new LogRecordExpressionRootObject(method, args, target, targetClass);
         LogRecordEvaluationContext evaluationContext = new LogRecordEvaluationContext(
                 rootObject, targetMethod, args, getParameterNameDiscoverer());
@@ -55,6 +55,7 @@ public class LogRecordOperationExpressionEvaluator extends CachedExpressionEvalu
         else if (result != NO_RESULT) {
             evaluationContext.setVariable(RESULT_VARIABLE, result);
         }
+        evaluationContext.setVariable(ERROR_MSG_VARIABLE, errorMsg);
         if (beanFactory != null) {
             evaluationContext.setBeanResolver(new BeanFactoryResolver(beanFactory));
         }
@@ -62,4 +63,9 @@ public class LogRecordOperationExpressionEvaluator extends CachedExpressionEvalu
     }
 
 
+     public void clear() {
+        this.conditionCache.clear();
+        this.expressionCache.clear();
+
+    }
 }

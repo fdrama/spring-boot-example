@@ -4,21 +4,21 @@ package com.example.springspelexample.service;
  * @author fdrama
  * date 2023年07月27日 13:56
  */
-public enum LogType {
+public enum LogSubType {
 
 
     /**
-     * 部门
+     * 新增
      */
-    DEPARTMENT(Constants.DEPARTMENT, "部门"),
+    ADD(Constants.ADD, "新增"),
 
-    USER(Constants.USER, "用户"),
+    UPDATE(Constants.UPDATE, "更新"),
     ;
 
     private final String typeCode;
     private final String typeDesc;
 
-    LogType(String typeCode, String typeDesc) {
+    LogSubType(String typeCode, String typeDesc) {
         this.typeCode = typeCode;
         this.typeDesc = typeDesc;
     }
@@ -32,15 +32,14 @@ public enum LogType {
     }
 
     public static class Constants {
-        /**
-         * 部门
-         */
-        public static final String DEPARTMENT = "DEPARTMENT";
-        /**
-         * 用户
-         */
-        public static final String USER = "USER";
 
+        public static final String ADD = "ADD";
+
+        public static final String UPDATE = "UPDATE";
+
+        public static final String DELETE = "DELETE";
+
+        public static final String QUERY = "QUERY";
 
     }
 }

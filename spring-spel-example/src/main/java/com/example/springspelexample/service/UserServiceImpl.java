@@ -1,5 +1,6 @@
 package com.example.springspelexample.service;
 
+import com.example.springspelexample.support.expression.LogRecordThreadContext;
 import org.springframework.stereotype.Service;
 
 /**
@@ -7,11 +8,18 @@ import org.springframework.stereotype.Service;
  * date 2023年07月27日 14:15
  */
 @Service
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService {
 
 
     @Override
-    public void updateUser(Inventor inventor) {
-        System.out.println("update user");
+    public User add(User user) {
+        LogRecordThreadContext.putVariable("content", "extra info");
+        return user;
+    }
+
+    @Override
+    public User update(User user) {
+
+        return user;
     }
 }

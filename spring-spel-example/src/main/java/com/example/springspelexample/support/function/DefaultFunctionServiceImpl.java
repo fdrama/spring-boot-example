@@ -1,10 +1,15 @@
 package com.example.springspelexample.support.function;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * @author fdrama
  * date 2023年07月28日 17:15
  */
-public class DefaultFunctionServiceImpl implements IFunctionService{
+public class DefaultFunctionServiceImpl implements IFunctionService {
+
+    protected final Log logger = LogFactory.getLog(getClass());
 
     private final ParseFunctionFactory parseFunctionFactory;
 
@@ -13,16 +18,13 @@ public class DefaultFunctionServiceImpl implements IFunctionService{
     }
 
     @Override
-    public String apply(String functionName, Object value) {
+    public String apply(String functionName, Object... value) {
         IParseFunction function = parseFunctionFactory.getFunction(functionName);
         if (function == null) {
-            return value.toString();
+            logger.warn("function not found: " + functionName);
+            return null;
         }
         return function.apply(value);
     }
 
-    @Override
-    public boolean beforeFunction(String functionName) {
-        return parseFunctionFactory.isBeforeFunction(functionName);
-    }
 }

@@ -3,7 +3,6 @@ package com.example.springspelexample.support.aop;
 import com.example.springspelexample.support.annoation.LogRecordOperationSource;
 import org.springframework.aop.ClassFilter;
 import org.springframework.aop.support.StaticMethodMatcherPointcut;
-import org.springframework.cache.CacheManager;
 import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 
@@ -28,18 +27,19 @@ public abstract class LogRecordOperationSourcePointcut extends StaticMethodMatch
         return (cas != null && !CollectionUtils.isEmpty(cas.getLogRecordOperation(method, targetClass)));
     }
 
+    /**
+     * Return the cache operation attribute source for this pointcut.
+     *
+     * @return
+     */
     @Nullable
     protected abstract LogRecordOperationSource getLogRecordOperationSource();
-
 
 
     private class LogRecordOperationSourceClassFilter implements ClassFilter {
 
         @Override
         public boolean matches(Class<?> clazz) {
-            if (CacheManager.class.isAssignableFrom(clazz)) {
-                return false;
-            }
             LogRecordOperationSource cas = getLogRecordOperationSource();
             return (cas == null || cas.isCandidateClass(clazz));
         }

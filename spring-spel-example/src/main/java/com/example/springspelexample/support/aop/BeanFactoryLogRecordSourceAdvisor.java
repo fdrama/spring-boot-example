@@ -4,7 +4,6 @@ import com.example.springspelexample.support.annoation.LogRecordOperationSource;
 import org.springframework.aop.ClassFilter;
 import org.springframework.aop.Pointcut;
 import org.springframework.aop.support.AbstractBeanFactoryPointcutAdvisor;
-import org.springframework.lang.Nullable;
 
 /**
  * @author fdrama
@@ -13,12 +12,10 @@ import org.springframework.lang.Nullable;
 public class BeanFactoryLogRecordSourceAdvisor extends AbstractBeanFactoryPointcutAdvisor {
 
 
-    @Nullable
     private LogRecordOperationSource logRecordOperationSource;
 
     private final LogRecordOperationSourcePointcut pointcut = new LogRecordOperationSourcePointcut() {
         @Override
-        @Nullable
         protected LogRecordOperationSource getLogRecordOperationSource() {
             return logRecordOperationSource;
         }
@@ -30,7 +27,7 @@ public class BeanFactoryLogRecordSourceAdvisor extends AbstractBeanFactoryPointc
      * attributes. This should usually be identical to the source reference
      * set on the cache interceptor itself.
      */
-    public void setLogRecordOperationSource(@Nullable LogRecordOperationSource logRecordOperationSource) {
+    public void setLogRecordOperationSource(LogRecordOperationSource logRecordOperationSource) {
         this.logRecordOperationSource = logRecordOperationSource;
     }
 

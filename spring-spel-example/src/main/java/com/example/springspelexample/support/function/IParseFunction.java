@@ -6,9 +6,19 @@ package com.example.springspelexample.support.function;
  */
 public interface IParseFunction {
 
+    /**
+     * function name
+     *
+     * @return
+     */
     String functionName();
 
-    String apply(Object value);
+    /**
+     * apply function
+     *
+     * @param value
+     * @return
+     */
+    String apply(Object... value);
 
-    boolean executeBefore();
 }

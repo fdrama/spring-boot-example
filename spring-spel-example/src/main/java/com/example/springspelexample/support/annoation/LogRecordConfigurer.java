@@ -1,7 +1,7 @@
 package com.example.springspelexample.support.annoation;
 
-import com.example.springspelexample.support.aop.LogRecordErrorHandler;
-import com.example.springspelexample.support.aop.LogRecordResolver;
+import com.example.springspelexample.support.config.LogRecordErrorHandler;
+import com.example.springspelexample.support.config.LogRecordResolver;
 import org.springframework.lang.Nullable;
 
 /**

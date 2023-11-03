@@ -1,19 +1,20 @@
 package com.example.springspelexample.support.annoation;
 
 import com.example.springspelexample.support.aop.BeanFactoryLogRecordSourceAdvisor;
-import com.example.springspelexample.support.aop.LogRecordErrorHandler;
 import com.example.springspelexample.support.aop.LogRecordInterceptor;
-import com.example.springspelexample.support.aop.LogRecordResolver;
+import com.example.springspelexample.support.config.LogRecordErrorHandler;
+import com.example.springspelexample.support.config.LogRecordResolver;
 import com.example.springspelexample.support.function.DefaultFunctionServiceImpl;
+import com.example.springspelexample.support.function.DefaultOperatorGetServiceImpl;
 import com.example.springspelexample.support.function.DefaultParseFunction;
 import com.example.springspelexample.support.function.IFunctionService;
+import com.example.springspelexample.support.function.IOperatorGetService;
 import com.example.springspelexample.support.function.IParseFunction;
 import com.example.springspelexample.support.function.ParseFunctionFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.config.CacheManagementConfigUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,13 +41,13 @@ public class ProxyLogRecordConfiguration implements ImportAware {
     @Nullable
     protected AnnotationAttributes enableLogRecord;
 
-
     @Nullable
     protected Supplier<LogRecordResolver> logResolver;
 
     @Nullable
     protected Supplier<LogRecordErrorHandler> errorHandler;
 
+    public static final String ORDER = "order";
 
     @Bean(name = CacheManagementConfigUtils.CACHE_ADVISOR_BEAN_NAME)
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
@@ -57,7 +58,7 @@ public class ProxyLogRecordConfiguration implements ImportAware {
         advisor.setLogRecordOperationSource(logRecordOperationSource);
         advisor.setAdvice(logRecordInterceptor);
         if (this.enableLogRecord != null) {
-            advisor.setOrder(this.enableLogRecord.<Integer>getNumber("order"));
+            advisor.setOrder(this.enableLogRecord.<Integer>getNumber(ORDER));
         }
         return advisor;
     }
@@ -96,6 +97,12 @@ public class ProxyLogRecordConfiguration implements ImportAware {
     }
 
 
+    @Bean
+    @ConditionalOnMissingBean(IOperatorGetService.class)
+    public DefaultOperatorGetServiceImpl operatorGetService() {
+        return new DefaultOperatorGetServiceImpl();
+    }
+
     @Override
     public void setImportMetadata(AnnotationMetadata importMetadata) {
         this.enableLogRecord = AnnotationAttributes.fromMap(
@@ -106,7 +113,7 @@ public class ProxyLogRecordConfiguration implements ImportAware {
         }
     }
 
-    @Autowired
+    @Autowired(required = false)
     void setConfigurers(ObjectProvider<LogRecordConfigurer> configurers) {
         Supplier<LogRecordConfigurer> configurer = () -> {
             List<LogRecordConfigurer> candidates = configurers.stream().collect(Collectors.toList());
@@ -138,9 +145,9 @@ public class ProxyLogRecordConfiguration implements ImportAware {
         }
 
         /**
-         * Adapt the {@link CachingConfigurer} supplier to another supplier
+         * Adapt the {@link LogRecordConfigurer} supplier to another supplier
          * provided by the specified mapping function. If the underlying
-         * {@link CachingConfigurer} is {@code null}, {@code null} is returned
+         * {@link LogRecordConfigurer} is {@code null}, {@code null} is returned
          * and the mapping function is not invoked.
          *
          * @param provider the provider to use to adapt the supplier

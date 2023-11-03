@@ -20,7 +20,6 @@ public class Inventor {
         GregorianCalendar c= new GregorianCalendar();
         this.name = name;
         this.nationality = nationality;
-        this.birthdate = c.getTime();
     }
     public Inventor(String name, Date birthdate, String nationality) {
         this.name = name;

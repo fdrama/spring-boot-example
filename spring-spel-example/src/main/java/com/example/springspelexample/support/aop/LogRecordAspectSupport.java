@@ -3,9 +3,15 @@ package com.example.springspelexample.support.aop;
 
 import com.example.springspelexample.support.annoation.LogRecordOperation;
 import com.example.springspelexample.support.annoation.LogRecordOperationSource;
+import com.example.springspelexample.support.config.LogRecordDetail;
+import com.example.springspelexample.support.config.LogRecordErrorHandler;
+import com.example.springspelexample.support.config.LogRecordResolver;
+import com.example.springspelexample.support.config.SimpleLogRecordErrorHandler;
+import com.example.springspelexample.support.config.SimpleLogRecordResolver;
 import com.example.springspelexample.support.expression.LogRecordOperationExpressionEvaluator;
 import com.example.springspelexample.support.expression.LogRecordThreadContext;
 import com.example.springspelexample.support.function.IFunctionService;
+import com.example.springspelexample.support.function.IOperatorGetService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.aop.framework.AopProxyUtils;
@@ -25,8 +31,10 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StopWatch;
 import org.springframework.util.StringUtils;
 import org.springframework.util.function.SingletonSupplier;
+import org.springframework.util.function.SupplierUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -47,41 +55,38 @@ import java.util.regex.Pattern;
  */
 public abstract class LogRecordAspectSupport implements BeanFactoryAware, InitializingBean, SmartInitializingSingleton {
 
-    @Nullable
+    public static final String COMMA = ",";
     private LogRecordOperationSource logRecordOperationSource;
 
-    @Nullable
     private BeanFactory beanFactory;
 
     private boolean initialized = false;
 
     protected final Log logger = LogFactory.getLog(getClass());
 
-    @Nullable
     private final Map<LogRecordOperationCacheKey, LogRecordOperationMetadata> metadataCache = new ConcurrentHashMap<>(1024);
 
     private final LogRecordOperationExpressionEvaluator evaluator = new LogRecordOperationExpressionEvaluator();
 
-    private SingletonSupplier<LogRecordResolver> logResolver;
+    private SingletonSupplier<LogRecordResolver> recordResolver;
 
     private SingletonSupplier<LogRecordErrorHandler> errorHandler;
 
     private IFunctionService functionService;
 
+    private IOperatorGetService operatorGetService;
     private final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{\\s*(\\w*)\\s*\\{(.*?)}}");
 
     public void configure(
             @Nullable Supplier<LogRecordErrorHandler> errorHandler, @Nullable Supplier<LogRecordResolver> logResolver) {
-
         this.errorHandler = new SingletonSupplier<>(errorHandler, SimpleLogRecordErrorHandler::new);
-        this.logResolver = new SingletonSupplier<>(logResolver, SimpleLogRecordResolver::new);
+        this.recordResolver = new SingletonSupplier<>(logResolver, SimpleLogRecordResolver::new);
     }
 
-    public void setLogRecordOperationSource(@Nullable LogRecordOperationSource logRecordOperationSource) {
+    public void setLogRecordOperationSource(LogRecordOperationSource logRecordOperationSource) {
         this.logRecordOperationSource = logRecordOperationSource;
     }
 
-    @Nullable
     public LogRecordOperationSource getLogRecordOperationSource() {
         return this.logRecordOperationSource;
     }
@@ -102,6 +107,7 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
     public void afterSingletonsInstantiated() {
         this.initialized = true;
         setFunctionService(BeanFactoryAnnotationUtils.qualifiedBeanOfType(beanFactory, IFunctionService.class, "functionService"));
+        setOperatorGetService(BeanFactoryAnnotationUtils.qualifiedBeanOfType(beanFactory, IOperatorGetService.class, "operatorGetService"));
     }
 
     protected Object execute(LogRecordOperationInvoker invoker, Object target, Method method, Object[] args) {
@@ -120,13 +126,26 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
 
     private Object execute(LogRecordOperationInvoker invoker, LogRecordOperationContexts contexts) {
         try {
-            Object result = invokeOperation(invoker);
-            LogRecordThreadContext.putEmptySpan();
+            StopWatch stopWatch = new StopWatch();
+            stopWatch.start();
+            long startTime = System.currentTimeMillis();
+            Object result = null;
+            Throwable e = null;
+            String errorMsg = null;
+            try {
+                result = invokeOperation(invoker);
+            } catch (Throwable throwable) {
+                e = throwable;
+                errorMsg = throwable.getMessage();
+            }
+            long endTime = System.currentTimeMillis();
+
             for (LogRecordOperationContext context : contexts.get(LogRecordOperation.class)) {
-                if (isConditionPassing(context, result)) {
-                    LogRecordOperation operation = context.getOperation();
-                    recordExecute(context, operation, result);
-                }
+                recordExecute(context, new MethodExecuteContext(startTime, endTime, result, e, errorMsg));
+            }
+            stopWatch.stop();
+            if (logger.isDebugEnabled()) {
+                logger.debug("LogRecordAspectSupport execute time: " + stopWatch.getTotalTimeMillis() + " ms");
             }
             return result;
         } finally {
@@ -134,31 +153,149 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
         }
     }
 
-    private void recordExecute(LogRecordOperationContext context, LogRecordOperation operation, Object result) {
-        List<String> spElTemplates = getSpELTemplates(operation);
-        EvaluationContext evaluationContext = evaluator.createEvaluationContext(context.metadata.method, context.args, context.target, context.metadata.targetClass, context.metadata.targetMethod, result, beanFactory);
-        Map<String, String> expressionValues = new HashMap<>(spElTemplates.size());
-        for (String spElTemplate : spElTemplates) {
-            if (spElTemplate.startsWith("{") && spElTemplate.endsWith("}")) {
-                AnnotatedElementKey methodKey = context.metadata.methodKey;
-                Matcher matcher = TEMPLATE_PATTERN.matcher(spElTemplate);
-                StringBuffer parsedStr = new StringBuffer();
-                while (matcher.find()) {
-                    String functionName = matcher.group(1);
-                    String expression = matcher.group(2);
-                    Object value = evaluator.getExpression(expression, methodKey, evaluationContext);
-                    ;
-                    if (StringUtils.hasText(functionName)) {
-                        value = functionService.apply(functionName, value);
-                    }
-                    matcher.appendReplacement(parsedStr, Matcher.quoteReplacement(value == null ? "" : value.toString()));
+    private void recordExecute(LogRecordOperationContext operationContext, MethodExecuteContext methodExecuteContext) {
+        try {
+            EvaluationContext evaluationContext = evaluator.createEvaluationContext(operationContext.metadata.method, operationContext.args, operationContext.target, operationContext.metadata.targetClass, operationContext.metadata.targetMethod, methodExecuteContext.getResult(), methodExecuteContext.getErrorMsg(), beanFactory);
+            if (!isConditionPass(operationContext, evaluationContext)) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("log record condition failed on method " + operationContext.metadata.method +
+                            " for operation " + operationContext.metadata.operation);
                 }
-                matcher.appendTail(parsedStr);
-                expressionValues.put(spElTemplate, parsedStr.toString());
-            } else {
-                expressionValues.put(spElTemplate, spElTemplate);
+                return;
+            }
+            String operatorId = getOperatorId(operationContext, evaluationContext);
+            if (!StringUtils.hasText(operatorId)) {
+                throw new IllegalArgumentException("log record operatorId is empty on method " + operationContext.metadata.method +
+                        " for operation " + operationContext.metadata.operation);
+            }
+            List<String> spElTemplates = getSpELTemplates(operationContext.metadata.operation);
+            Map<String, String> expressionValues = new HashMap<>(spElTemplates.size());
+            Map<String, String> functionValues = new HashMap<>(spElTemplates.size());
+            for (String spElTemplate : spElTemplates) {
+                if (spElTemplate.contains("{") && spElTemplate.contains("}")) {
+                    AnnotatedElementKey methodKey = operationContext.metadata.methodKey;
+                    Matcher matcher = TEMPLATE_PATTERN.matcher(spElTemplate);
+                    StringBuffer parsedStr = new StringBuffer();
+                    while (matcher.find()) {
+                        String functionName = matcher.group(1);
+                        String expression = matcher.group(2);
+                        String expressionValue;
+                        if (StringUtils.hasText(functionName)) {
+                            expressionValue = nullToEmpty(getFunctionValue(functionName, expression, functionValues, methodKey, evaluationContext));
+                        } else {
+                            expressionValue = nullToEmpty(evaluator.getExpressionValue(expression, methodKey, evaluationContext));
+                        }
+                        matcher.appendReplacement(parsedStr, Matcher.quoteReplacement(expressionValue == null ? "" : expressionValue));
+                    }
+                    matcher.appendTail(parsedStr);
+                    expressionValues.put(spElTemplate, parsedStr.toString());
+                } else {
+                    expressionValues.put(spElTemplate, spElTemplate);
+                }
+            }
+            Boolean successCondition = getSuccessCondition(operationContext, evaluationContext, methodExecuteContext);
+            resolveLogRecord(operationContext, expressionValues, methodExecuteContext, successCondition, operatorId);
+        } catch (RuntimeException e) {
+            logger.error("LogRecordAspectSupport recordExecute error", e);
+            if (operationContext.metadata.errorHandler != null) {
+                operationContext.metadata.errorHandler.handleLogRecordError(operationContext, e);
             }
         }
+
+    }
+
+    private String getOperatorId(LogRecordOperationContext operationContext, EvaluationContext evaluationContext) {
+
+        if (StringUtils.hasText(operationContext.metadata.operation.getOperator())) {
+            return nullToEmpty(evaluator.getExpressionValue(operationContext.metadata.operation.getOperator(),
+                    operationContext.metadata.methodKey, evaluationContext));
+        } else {
+            if (operatorGetService == null) {
+                return null;
+            } else {
+                return operatorGetService.get();
+            }
+        }
+    }
+
+    private Boolean getSuccessCondition(LogRecordOperationContext operationContext, EvaluationContext evaluationContext, MethodExecuteContext methodExecuteContext) {
+        if (!StringUtils.hasText(operationContext.metadata.operation.getSuccessCondition())) {
+            return methodExecuteContext.getThrowable() == null;
+        } else {
+            return evaluator.condition(operationContext.metadata.operation.getSuccessCondition(),
+                    operationContext.metadata.methodKey, evaluationContext);
+        }
+    }
+
+    private Boolean isConditionPass(LogRecordOperationContext operationContext, EvaluationContext evaluationContext) {
+        if (!StringUtils.hasText(operationContext.metadata.operation.getCondition())) {
+            return true;
+        }
+        return evaluator.condition(operationContext.metadata.operation.getCondition(),
+                operationContext.metadata.methodKey, evaluationContext);
+    }
+
+
+    private String nullToEmpty(Object object) {
+        return object == null ? "" : object.toString();
+    }
+
+    private String getFunctionValue(String functionName, String expression, Map<String, String> functionValues, AnnotatedElementKey methodKey, EvaluationContext evalContext) {
+        String[] expressionArray;
+        if (expression.contains(COMMA)) {
+            expressionArray = expression.split(COMMA);
+        } else {
+            expressionArray = new String[]{expression};
+        }
+        List<Object> args = new ArrayList<>(expressionArray.length);
+        for (String ex : expressionArray) {
+            if (!StringUtils.hasText(ex)) {
+                args.add(ex);
+            } else {
+                Object arg = evaluator.getExpressionValue(ex, methodKey, evalContext);
+                args.add(arg);
+            }
+        }
+        String functionReturnValue;
+        String functionCallInstanceKey = getFunctionCallInstanceKey(functionName, expression);
+        if (functionValues != null && functionValues.containsKey(functionCallInstanceKey)) {
+            functionReturnValue = functionValues.get(functionCallInstanceKey);
+        } else {
+            functionReturnValue = functionService.apply(functionName, args.toArray());
+        }
+        return functionReturnValue;
+    }
+
+    private String getFunctionCallInstanceKey(String functionName, String expression) {
+        return functionName + expression;
+    }
+
+    private void resolveLogRecord(LogRecordOperationContext context, Map<String, String> expressionValues, MethodExecuteContext methodExecuteContext, Boolean successCondition, String operatorId) {
+        boolean methodSuccess = methodExecuteContext.throwable == null;
+        LogRecordOperation operation = context.metadata.operation;
+        if (successCondition && !StringUtils.hasText(operation.getSuccessTemplate())) {
+            logger.warn("LogRecordAspectSupport saveLogRecordDetail successCondition is true but successTemplate is empty");
+            return;
+        }
+        if (!successCondition && !StringUtils.hasText(operation.getFailTemplate())) {
+            logger.warn("LogRecordAspectSupport saveLogRecordDetail successCondition is false but failTemplate is empty");
+            return;
+        }
+        LogRecordDetail recordDetail = LogRecordDetail.builder()
+                .bizNo(expressionValues.get(operation.getBizNo()))
+                .extra(expressionValues.get(operation.getExtra()))
+                .content(expressionValues.get(successCondition ? operation.getSuccessTemplate() : operation.getFailTemplate()))
+                .type(expressionValues.get(operation.getType()))
+                .subType(expressionValues.get(operation.getSubType()))
+                .methodName(context.metadata.method.getName())
+                .className(context.metadata.targetClass.getName())
+                .operatorId(operatorId)
+                .operateTimeBegin(methodExecuteContext.getStartTime())
+                .operateTimeEnd(methodExecuteContext.getEndTime())
+                .methodSuccess(methodSuccess)
+                .build();
+        LogRecordResolver logRecordResolver = context.metadata.recordResolver;
+        logRecordResolver.resolveLog(recordDetail);
     }
 
     private List<String> getSpELTemplates(LogRecordOperation operation) {
@@ -166,22 +303,13 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
         spElTemplates.add(operation.getType());
         spElTemplates.add(operation.getSubType());
         spElTemplates.add(operation.getCondition());
-        spElTemplates.add(operation.getOperator());
+        spElTemplates.add(operation.getSuccessCondition());
         spElTemplates.add(operation.getBizNo());
-        spElTemplates.add(operation.getContent());
+        spElTemplates.add(operation.getSuccessTemplate());
+        spElTemplates.add(operation.getFailTemplate());
         spElTemplates.add(operation.getExtra());
         return spElTemplates;
     }
-
-    private boolean isConditionPassing(LogRecordOperationContext context, Object object) {
-        boolean passing = context.isConditionPassing(object);
-        if (!passing && logger.isTraceEnabled()) {
-            logger.trace("log record condition failed on method " + context.metadata.method +
-                    " for operation " + context.metadata.operation);
-        }
-        return passing;
-    }
-
 
     private Class<?> getTargetClass(Object target) {
         return AopProxyUtils.ultimateTargetClass(target);
@@ -218,15 +346,51 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
         return new LogRecordOperationContext(metadata, args, target);
     }
 
-    protected class LogRecordOperationContext implements LogRecordOperationInvocationContext<LogRecordOperation> {
+    private static class MethodExecuteContext {
+        private final long startTime;
+        private final long endTime;
+        private final Object result;
+        private final Throwable throwable;
+
+        private final String errorMsg;
+
+        public MethodExecuteContext(long startTime, long endTime, Object result, Throwable throwable, String errorMsg) {
+            this.startTime = startTime;
+            this.endTime = endTime;
+            this.result = result;
+            this.throwable = throwable;
+            this.errorMsg = errorMsg;
+        }
+
+
+        public long getStartTime() {
+            return startTime;
+        }
+
+        public Throwable getThrowable() {
+            return throwable;
+        }
+
+        public long getEndTime() {
+            return endTime;
+        }
+
+        public Object getResult() {
+            return result;
+        }
+
+        public String getErrorMsg() {
+            return errorMsg;
+        }
+    }
+
+    protected static class LogRecordOperationContext implements LogRecordOperationInvocationContext<LogRecordOperation> {
         private final LogRecordOperationMetadata metadata;
 
         private final Object[] args;
 
         private final Object target;
 
-        @Nullable
-        private Boolean conditionPassing;
 
         public LogRecordOperationContext(LogRecordOperationMetadata metadata, Object[] args, Object target) {
             this.metadata = metadata;
@@ -264,24 +428,6 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
         public LogRecordOperation getOperation() {
             return this.metadata.operation;
         }
-
-        protected boolean isConditionPassing(Object result) {
-            if (this.conditionPassing == null) {
-                if (StringUtils.hasText(this.metadata.operation.getCondition())) {
-                    EvaluationContext evaluationContext = createEvaluationContext(result);
-                    this.conditionPassing = evaluator.condition(this.metadata.operation.getCondition(),
-                            this.metadata.methodKey, evaluationContext);
-                } else {
-                    this.conditionPassing = true;
-                }
-            }
-            return this.conditionPassing;
-        }
-
-        private EvaluationContext createEvaluationContext(@Nullable Object result) {
-            return evaluator.createEvaluationContext(this.metadata.method, this.args,
-                    this.target, this.metadata.targetClass, this.metadata.targetMethod, result, beanFactory);
-        }
     }
 
     protected LogRecordOperationMetadata getLogRecordOperationMetadata(
@@ -290,8 +436,19 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
         LogRecordOperationCacheKey cacheKey = new LogRecordOperationCacheKey(operation, method, targetClass);
         LogRecordOperationMetadata metadata = this.metadataCache.get(cacheKey);
         if (metadata == null) {
-
-            metadata = new LogRecordOperationMetadata(operation, method, targetClass);
+            LogRecordErrorHandler operationErrorHandler;
+            if (StringUtils.hasText(operation.getErrorHandler())) {
+                operationErrorHandler = getBean(operation.getErrorHandler(), LogRecordErrorHandler.class);
+            } else {
+                operationErrorHandler = SupplierUtils.resolve(this.errorHandler);
+            }
+            LogRecordResolver operationRecordResolver;
+            if (StringUtils.hasText(operation.getLogResolver())) {
+                operationRecordResolver = getBean(operation.getLogResolver(), LogRecordResolver.class);
+            } else {
+                operationRecordResolver = SupplierUtils.resolve(this.recordResolver);
+            }
+            metadata = new LogRecordOperationMetadata(operation, method, targetClass, operationErrorHandler, operationRecordResolver);
             this.metadataCache.put(cacheKey, metadata);
         }
         return metadata;
@@ -309,14 +466,19 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
 
         private final AnnotatedElementKey methodKey;
 
+        private final LogRecordErrorHandler errorHandler;
 
-        public LogRecordOperationMetadata(LogRecordOperation operation, Method method, Class<?> targetClass) {
+        private final LogRecordResolver recordResolver;
+
+        public LogRecordOperationMetadata(LogRecordOperation operation, Method method, Class<?> targetClass, LogRecordErrorHandler errorHandler, LogRecordResolver recordResolver) {
             this.operation = operation;
             this.method = BridgeMethodResolver.findBridgedMethod(method);
             this.targetClass = targetClass;
             this.targetMethod = (!Proxy.isProxyClass(targetClass) ?
                     AopUtils.getMostSpecificMethod(method, targetClass) : this.method);
             this.methodKey = new AnnotatedElementKey(this.targetMethod, targetClass);
+            this.errorHandler = errorHandler;
+            this.recordResolver = recordResolver;
         }
     }
 
@@ -377,10 +539,14 @@ public abstract class LogRecordAspectSupport implements BeanFactoryAware, Initia
      */
     protected void clearMetadataCache() {
         this.metadataCache.clear();
-        // this.evaluator.clear();
+        this.evaluator.clear();
     }
 
     public void setFunctionService(IFunctionService functionService) {
         this.functionService = functionService;
+    }
+
+    public void setOperatorGetService(IOperatorGetService operatorGetService) {
+        this.operatorGetService = operatorGetService;
     }
 }

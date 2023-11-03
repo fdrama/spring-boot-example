@@ -1,4 +1,4 @@
-package com.example.springspelexample.support.annoation;
+package com.example.springspelexample.support.config;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

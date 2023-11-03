@@ -6,7 +6,13 @@ package com.example.springspelexample.support.function;
  */
 public interface IFunctionService {
 
-    String apply(String functionName, Object value);
+    /**
+     * apply function
+     *
+     * @param functionName
+     * @param value
+     * @return
+     */
+    String apply(String functionName, Object... value);
 
-    boolean beforeFunction(String functionName);
 }

@@ -20,18 +20,53 @@ import java.lang.annotation.Target;
 public @interface LogRecord {
     String bizNo() default "";
 
+    /**
+     * 日志记录条件 默认记录
+     * @return
+     */
     String condition() default "";
 
-    String content() default "";
+    /**
+     * 日志记录成功条件 默认成功
+     * @return
+     */
+    String successCondition() default "";
 
+    /**
+     * 日志记录成功模板
+     * @return
+     */
+    String successTemplate() default "";
+
+    /**
+     * 日志记录失败模板
+     * @return
+     */
+    String failTemplate() default "";
+
+    /**
+     * 日志记录额外信息
+     * @return
+     */
     String extra() default "";
 
-    String operator() default "";
+    /**
+     * 操作人id
+     * @return
+     */
+    String operatorId() default "";
 
+    /**
+     * 日志类型
+     * @return
+     */
     String type() default "";
 
+    /**
+     * 日志子类型
+     * @return
+     */
     String subType() default "";
 
-    String operatorGetter() default "";
 
 }

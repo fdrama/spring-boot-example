@@ -9,19 +9,21 @@ import org.springframework.util.Assert;
 
 public class LogRecordOperation {
 
-    private String content;
-    private String type;
-    private String subType;
-    private String bizNo;
-    private String extra;
-    private String operator;
-    private String condition;
+    private final String successTemplate;
 
-    private String operatorGetter;
+    private final String failTemplate;
+    private final String type;
+    private final String subType;
+    private final String bizNo;
+    private final String extra;
+    private final String operator;
+    private final String condition;
 
-    private String logResolver;
+    private final String successCondition;
 
-    private String errorHandler;
+    private final String logResolver;
+
+    private final String errorHandler;
 
     public String getErrorHandler() {
         return errorHandler;
@@ -31,8 +33,12 @@ public class LogRecordOperation {
         return logResolver;
     }
 
-    public String getContent() {
-        return content;
+    public String getFailTemplate() {
+        return failTemplate;
+    }
+
+    public String getSuccessTemplate() {
+        return successTemplate;
     }
 
     public String getType() {
@@ -55,12 +61,12 @@ public class LogRecordOperation {
         return operator;
     }
 
-    public String getOperatorGetter() {
-        return operatorGetter;
-    }
-
     public String getCondition() {
         return condition;
+    }
+
+    public String getSuccessCondition() {
+        return successCondition;
     }
 
     private String toString;
@@ -72,23 +78,25 @@ public class LogRecordOperation {
 
     protected LogRecordOperation(Builder b) {
 
-        this.content = b.content;
+        this.successTemplate = b.successTemplate;
+        this.failTemplate = b.failTemplate;
         this.type = b.type;
         this.subType = b.subType;
         this.bizNo = b.bizNo;
         this.extra = b.extra;
         this.operator = b.operator;
         this.condition = b.condition;
-        this.operatorGetter = b.operatorGetter;
+        this.successCondition = b.successCondition;
         this.logResolver = b.logResolver;
         this.errorHandler = b.errorHandler;
         this.toString = b.getOperationDescription().toString();
-
     }
 
     public static class Builder {
         // required parameters
-        private String content = "";
+        private String successTemplate = "";
+
+        private String failTemplate = "";
         private String type = "";
         private String subType = "";
         private String bizNo;
@@ -96,7 +104,7 @@ public class LogRecordOperation {
         private String operator;
         private String condition = "";
 
-        private String operatorGetter = "";
+        private String successCondition = "";
 
         private String name = "";
 
@@ -120,65 +128,48 @@ public class LogRecordOperation {
             this.logResolver = logResolver;
         }
 
-        public String getContent() {
-            return content;
+        public void setSuccessTemplate(String successTemplate) {
+            this.successTemplate = successTemplate;
         }
 
-        public void setContent(String content) {
-            Assert.hasText(content, "content must not be empty");
-            this.content = content;
+        public void setSuccessCondition(String successCondition) {
+            this.successCondition = successCondition;
         }
 
-        public String getType() {
-            return type;
+        public void setFailTemplate(String failTemplate) {
+            this.failTemplate = failTemplate;
         }
 
         public void setType(String type) {
             Assert.hasText(type, "type must not be empty");
-
             this.type = type;
         }
 
-        public String getSubType() {
-            return subType;
-        }
 
         public void setSubType(String subType) {
             this.subType = subType;
         }
 
-        public String getBizNo() {
-            return bizNo;
-        }
 
         public void setBizNo(String bizNo) {
             Assert.hasText(bizNo, "bizNo must not be empty");
             this.bizNo = bizNo;
         }
 
-        public String getExtra() {
-            return extra;
-        }
-
         public void setExtra(String extra) {
             this.extra = extra;
         }
 
-        public String getOperator() {
-            return operator;
-        }
 
         public void setOperator(String operator) {
             this.operator = operator;
         }
 
-        public String getCondition() {
-            return condition;
-        }
 
         public void setCondition(String condition) {
             this.condition = condition;
         }
+
         public void setName(String name) {
             this.name = name;
         }
@@ -187,25 +178,19 @@ public class LogRecordOperation {
             return name;
         }
 
-        public void setOperatorGetter(String operatorGetter) {
-            this.operatorGetter = operatorGetter;
-        }
-
-        public String getOperatorGetter() {
-            return operatorGetter;
-        }
 
         protected StringBuilder getOperationDescription() {
             StringBuilder result = new StringBuilder(getClass().getSimpleName());
             result.append("[");
-            result.append("content=").append(content);
+            result.append("successTemplate=").append(successTemplate);
+            result.append(", failTemplate=").append(failTemplate);
             result.append(", type=").append(type);
             result.append(", subType=").append(subType);
             result.append(", bizNo=").append(bizNo);
             result.append(", extra=").append(extra);
             result.append(", operator=").append(operator);
             result.append(", condition=").append(condition);
-            result.append(", operatorGetter=").append(operatorGetter);
+            result.append(", successCondition=").append(successCondition);
             result.append("]");
             return result;
         }
