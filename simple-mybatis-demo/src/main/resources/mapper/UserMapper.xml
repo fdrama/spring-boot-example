@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.simplemybatisdemo.dao.mapper.UserMapper">
+    <resultMap id="userResultMap" type="com.example.simplemybatisdemo.dao.entity.User">
+        <id property="id" column="id"/>
+        <result property="username" column="username" jdbcType="VARCHAR"/>
+        <result property="email" column="email"/>
+        <result property="password" column="password"/>
+        <result property="firstName" column="first_name"/>
+        <result property="lastName" column="last_name"/>
+        <result property="phone" column="phone"/>
+        <result property="avatar" column="avatar"/>
+        <result property="gender" column="gender"/>
+        <result property="birthday" column="birthday"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="userResultMap">
+        SELECT * FROM user
+    </select>
+
+    <select id="selectById" resultMap="userResultMap">
+        SELECT * FROM user WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.example.simplemybatisdemo.dao.entity.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (username, email, password, first_name, last_name, phone, avatar, gender, birthday)
+        VALUES (#{username}, #{email}, #{password}, #{firstName}, #{lastName}, #{phone}, #{avatar}, #{gender, typeHandler=com.example.simplemybatisdemo.dao.typehandler.GenderTypeHandler}, #{birthday})
+    </insert>
+
+    <update id="update" parameterType="com.example.simplemybatisdemo.dao.entity.User">
+        UPDATE user
+        SET username = #{username},
+            email = #{email},
+            password = #{password},
+            first_name = #{firstName},
+            last_name = #{lastName},
+            phone = #{phone},
+            avatar = #{avatar},
+            gender = #{gender, jdbcType=VARCHAR,typeHandler=com.example.simplemybatisdemo.dao.typehandler.GenderTypeHandler},
+            birthday = #{birthday}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM user WHERE id = #{id}
+    </delete>
+</mapper>
