@@ -17,6 +17,14 @@ class SimpleMybatisDemoApplicationTests {
     @Autowired
     private UserMapper userMapper;
 
+
+    @Test
+    public void testInt(){
+        Integer i = 2;
+        Integer j = 2;
+        Assert.isTrue(i == j, "i != j");
+    }
+
     @Test
     void contextLoads() {
         List<User> users = userMapper.selectAll();
